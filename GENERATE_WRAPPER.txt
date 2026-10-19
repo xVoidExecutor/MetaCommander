@@ -1,0 +1,7 @@
+MetaCommander Android project
+
+Requires JDK 17 and Gradle 8.9. From this directory run:
+  gradle wrapper --gradle-version 8.9
+  ./gradlew assembleDebug
+
+GitHub Actions performs the same wrapper bootstrap and builds a debug APK.
