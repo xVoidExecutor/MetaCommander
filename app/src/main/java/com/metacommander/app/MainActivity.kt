@@ -66,10 +66,10 @@ import java.util.Locale
 
 private val AppBg = Color(0xFFF1F5F9)
 private val Ink = Color(0xFF0F172A)
-private val MetaBlue = Color(0xFF0668E1)
-private val Muted = Color(0xFF64748B)
-private val Good = Color(0xFF16A34A)
-private val Bad = Color(0xFFDC2626)
+internal val MetaBlue = Color(0xFF0668E1)
+internal val Muted = Color(0xFF64748B)
+internal val Good = Color(0xFF16A34A)
+internal val Bad = Color(0xFFDC2626)
 private val WaGreen = Color(0xFF128C7E)
 private const val BDT_RATE = 120.0
 
@@ -93,7 +93,7 @@ private val DarkColors = darkColorScheme(
 )
 
 /** Soft, layered white-card shadow (#0F172A at ~10%). */
-private fun Modifier.soft(shape: Shape, elevation: Dp = 6.dp): Modifier =
+internal fun Modifier.soft(shape: Shape, elevation: Dp = 6.dp): Modifier =
     this.shadow(elevation, shape, clip = false, ambientColor = Ink.copy(alpha = 0.10f), spotColor = Ink.copy(alpha = 0.10f))
 
 // ───────────────────────── Data ─────────────────────────
@@ -101,7 +101,8 @@ private fun Modifier.soft(shape: Shape, elevation: Dp = 6.dp): Modifier =
 data class AdAccount(val name: String, val id: String, val active: Boolean, val limit: Double)
 data class CampaignItem(
     val id: Int, val accountId: String, val name: String, val active: Boolean, val budget: Double,
-    val cpr: Double, val ctr: Double, val cpc: Double, val spend: Double, val totalBudget: Double, val used: Double
+    val cpr: Double, val ctr: Double, val cpc: Double, val spend: Double, val totalBudget: Double, val used: Double,
+    val isNew: Boolean = false
 )
 data class Msg(val text: String, val mine: Boolean)
 data class ClientChat(val name: String, val phone: String, val accountId: String, val unread: Int, val messages: List<Msg>)
@@ -123,7 +124,7 @@ class AdsViewModel : ViewModel() {
         CampaignItem(1, "act_104829371", "Eid Collection – Conversions", true, 90.0, .42, 3.1, .18, 78.20, 300.0, 212.4),
         CampaignItem(2, "act_104829371", "Retargeting – Cart Viewers", true, 60.0, .31, 4.4, .12, 51.60, 200.0, 141.9),
         CampaignItem(3, "act_104829371", "Page Likes – Dhaka", false, 20.0, .09, 1.8, .05, 0.0, 100.0, 38.5),
-        CampaignItem(4, "act_104829371", "Messages – WhatsApp Leads", true, 70.0, .55, 2.7, .21, 52.60, 250.0, 177.6),
+        CampaignItem(4, "act_104829371", "Messages – WhatsApp Leads", true, 70.0, .55, 2.7, .21, 52.60, 250.0, 177.6, isNew = true),
         CampaignItem(5, "act_208817452", "Laptop Deals – Traffic", true, 60.0, .38, 2.9, .16, 44.50, 250.0, 160.2),
         CampaignItem(6, "act_208817452", "Phone Accessories – Sales", true, 40.0, .47, 3.4, .19, 31.20, 150.0, 88.7),
         CampaignItem(7, "act_208817452", "Brand Awareness – Reach", true, 30.0, .06, 1.2, .04, 20.40, 120.0, 64.3),
@@ -164,6 +165,7 @@ class AdsViewModel : ViewModel() {
     var darkTheme by mutableStateOf(false)
     var biometricEnabled by mutableStateOf(true)
     var showBdt by mutableStateOf(false)
+    var desktop by mutableStateOf(false)
     val rules = mutableStateListOf(true, true, false, false)
 
     fun campaignsOf(accountId: String) = campaigns.filter { it.accountId == accountId }
@@ -178,6 +180,11 @@ class AdsViewModel : ViewModel() {
     fun setBudget(id: Int, value: Double) {
         val i = campaigns.indexOfFirst { it.id == id }
         if (i >= 0) campaigns[i] = campaigns[i].copy(budget = value)
+    }
+    fun addCampaign(accountId: String, name: String, daily: Double, total: Double) {
+        val id = (campaigns.maxOfOrNull { it.id } ?: 0) + 1
+        campaigns.add(0, CampaignItem(id, accountId, name, true, daily, 0.0, 0.0, 0.0, 0.0, total, 0.0, isNew = true))
+        notice = "Campaign created (demo preview — not sent to Meta)."
     }
     fun openChat(i: Int) {
         if (i in chats.indices) { selectedChat = i; chats[i] = chats[i].copy(unread = 0) }
@@ -206,7 +213,7 @@ class AppStore(private val ctx: Context) {
     fun setFlag(key: String, value: Boolean) { ui.edit().putBoolean(key, value).apply() }
 }
 
-private class Actions(
+internal class Actions(
     val meta: () -> Unit,
     val business: () -> Unit,
     val pages: () -> Unit,
@@ -229,6 +236,7 @@ class MainActivity : FragmentActivity() {
             vm.darkTheme = store.flag("dark", false)
             vm.biometricEnabled = store.flag("bio", true)
             vm.showBdt = store.flag("bdt", false)
+            vm.desktop = store.flag("desk", false)
         }
         val actions = Actions(
             meta = { openUrl("https://www.facebook.com/adsmanager/") },
@@ -336,8 +344,8 @@ class MainActivity : FragmentActivity() {
 
 // ───────────────────────── Helpers ─────────────────────────
 
-private fun money(v: Double) = String.format(Locale.US, "%.2f", v)
-private fun usd(v: Double, bdt: Boolean = false): String =
+internal fun money(v: Double) = String.format(Locale.US, "%.2f", v)
+internal fun usd(v: Double, bdt: Boolean = false): String =
     "\$" + money(v) + (if (bdt) "  (৳" + String.format(Locale.US, "%,.0f", v * BDT_RATE) + ")" else "")
 private fun today(): String = LocalDate.now().format(DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.US))
 private fun hashPin(pin: String): String =
@@ -361,6 +369,14 @@ private fun reportMessage(vm: AdsViewModel, account: AdAccount?): String {
     sb.append("— Sent via MetaCommander")
     return sb.toString()
 }
+
+private fun campaignStatus(c: CampaignItem): String = when {
+    !c.active -> "Paused"
+    c.isNew -> "New"
+    else -> "Active"
+}
+
+private fun <T> nextOf(current: T, options: List<T>): T = options[(options.indexOf(current) + 1) % options.size]
 
 // ───────────────────────── App shell ─────────────────────────
 
@@ -390,23 +406,35 @@ private fun MetaCommanderApp(vm: AdsViewModel, store: AppStore, act: Actions) {
     ) { vm.back() }
 
     val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+    val desk = vm.desktop && vm.unlocked
 
     MaterialTheme(colorScheme = if (dark) DarkColors else LightColors) {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
             snackbarHost = { SnackbarHost(snackbar) },
-            bottomBar = { if (vm.unlocked && !imeVisible) BottomDock(vm) }
+            floatingActionButton = { if (vm.unlocked && !imeVisible) ModeButton(vm, store) },
+            bottomBar = { if (vm.unlocked && !imeVisible && !desk) BottomDock(vm) }
         ) { pad ->
-            Box(Modifier.padding(pad).fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-                Box(Modifier.widthIn(max = 640.dp).fillMaxSize()) {
-                    when {
-                        !vm.unlocked -> LoginScreen(vm, store, act)
-                        vm.nav == 3 -> WhatsAppScreen(vm, act)
-                        vm.nav == 1 -> ShortcutScreen("Business Suite", "Manage business assets in Meta’s secure web experience.", "Open Business Suite", "🗂️", act.business)
-                        vm.nav == 2 -> ShortcutScreen("Facebook Pages", "Open your linked Pages and profiles.", "Open my Pages", "📄", act.pages)
-                        vm.selectedTool.isNotEmpty() -> ToolScreen(vm, store, act)
-                        vm.selectedAccount >= 0 -> AccountScreen(vm, act)
-                        else -> DashboardScreen(vm, act)
+            Row(Modifier.padding(pad).fillMaxSize()) {
+                if (desk) DesktopRail(vm)
+                val scroll = rememberScrollState()
+                Box(
+                    Modifier.weight(1f).fillMaxHeight()
+                        .then(if (desk) Modifier.horizontalScroll(scroll) else Modifier),
+                    contentAlignment = Alignment.TopCenter
+                ) {
+                    Box(
+                        Modifier.then(if (desk) Modifier.width(1200.dp) else Modifier.widthIn(max = 640.dp)).fillMaxSize()
+                    ) {
+                        when {
+                            !vm.unlocked -> LoginScreen(vm, store, act)
+                            vm.nav == 3 -> WhatsAppScreen(vm, act)
+                            vm.nav == 1 -> BusinessSuiteScreen(vm, act)
+                            vm.nav == 2 -> ShortcutScreen("Facebook Pages", "Open your linked Pages and profiles.", "Open my Pages", "📄", act.pages)
+                            vm.selectedTool.isNotEmpty() -> ToolScreen(vm, store, act)
+                            vm.selectedAccount >= 0 -> AccountScreen(vm, act)
+                            else -> DashboardScreen(vm, act)
+                        }
                     }
                 }
             }
@@ -470,6 +498,38 @@ private fun MetaCommanderApp(vm: AdsViewModel, store: AppStore, act: Actions) {
             },
             dismissButton = { TextButton(onClick = { vm.showNewChat = false }) { Text("Cancel") } }
         )
+    }
+}
+
+@Composable
+private fun ModeButton(vm: AdsViewModel, store: AppStore) {
+    ExtendedFloatingActionButton(
+        onClick = { vm.desktop = !vm.desktop; store.setFlag("desk", vm.desktop) },
+        containerColor = MetaBlue,
+        contentColor = Color.White,
+        icon = { Icon(if (vm.desktop) Icons.Default.PhoneAndroid else Icons.Default.DesktopWindows, null) },
+        text = { Text(if (vm.desktop) "Mobile mode" else "Desktop mode", fontWeight = FontWeight.Bold) }
+    )
+}
+
+@Composable
+private fun DesktopRail(vm: AdsViewModel) {
+    val labels = listOf("Meta Ads", "Business", "Pages", "WhatsApp")
+    val icons = listOf(Icons.Default.Campaign, Icons.Default.Dashboard, Icons.Default.Flag, Icons.Default.Chat)
+    NavigationRail(containerColor = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxHeight()) {
+        Spacer(Modifier.height(12.dp))
+        labels.forEachIndexed { i, label ->
+            NavigationRailItem(
+                selected = vm.nav == i,
+                onClick = { vm.nav = i; vm.selectedAccount = -1; vm.selectedTool = ""; vm.selectedChat = -1 },
+                icon = { Icon(icons[i], label) },
+                label = { Text(label, fontSize = 11.sp, maxLines = 1) },
+                colors = NavigationRailItemDefaults.colors(
+                    selectedIconColor = MetaBlue, selectedTextColor = MetaBlue,
+                    indicatorColor = MetaBlue.copy(alpha = 0.14f)
+                )
+            )
+        }
     }
 }
 
@@ -582,6 +642,7 @@ private fun PadKey(label: String?, icon: ImageVector?, description: String, modi
 private fun DashboardScreen(vm: AdsViewModel, act: Actions) {
     val b = vm.showBdt
     val filtered = vm.accounts.withIndex().filter { it.value.name.contains(vm.search, true) || it.value.id.contains(vm.search, true) }
+    val toolCols = if (vm.desktop) 6 else 3
     LazyColumn(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -614,7 +675,7 @@ private fun DashboardScreen(vm: AdsViewModel, act: Actions) {
         }
         item { Metric("Today's total spend", usd(vm.campaigns.sumOf { it.spend }, b), "Demo data • not live Meta data", Modifier.fillMaxWidth()) }
         item { Text("Tools", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold) }
-        items(toolItems.chunked(3)) { row ->
+        items(toolItems.chunked(toolCols)) { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 row.forEach { (name, emoji) ->
                     val shape = RoundedCornerShape(18.dp)
@@ -628,7 +689,7 @@ private fun DashboardScreen(vm: AdsViewModel, act: Actions) {
                         }
                     }
                 }
-                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+                repeat(toolCols - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
         item {
@@ -673,10 +734,12 @@ private fun DashboardScreen(vm: AdsViewModel, act: Actions) {
     }
 }
 
-// ───────────────────────── Account details ─────────────────────────
+// ───────────────────────── Account details (campaign management) ─────────────────────────
 
 @Composable
 private fun AccountScreen(vm: AdsViewModel, act: Actions) {
+    var statusFilter by remember { mutableStateOf("All") }
+    var showNewCampaign by remember { mutableStateOf(false) }
     val a = vm.accounts.getOrNull(vm.selectedAccount) ?: return
     val b = vm.showBdt
     val cs = vm.campaignsOf(a.id)
@@ -686,7 +749,7 @@ private fun AccountScreen(vm: AdsViewModel, act: Actions) {
             IconButton(onClick = { vm.selectedAccount = -1 }) { Icon(Icons.Default.ArrowBack, "Back") }
             Column(Modifier.weight(1f)) {
                 Text(a.name, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(a.id, fontSize = 12.sp, color = Muted)
+                Text("${a.id} · ${vm.activeCount(a.id)} active campaigns", fontSize = 12.sp, color = Muted)
             }
             Pill(a.active)
             Spacer(Modifier.width(8.dp))
@@ -707,67 +770,70 @@ private fun AccountScreen(vm: AdsViewModel, act: Actions) {
             }
         }
         when (vm.accountTab) {
-            0 -> LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.weight(1f)) {
-                item {
-                    val cap = cs.filter { it.active }.sumOf { it.budget }
-                    CardTile {
-                        Text("Live budget tracker", fontWeight = FontWeight.Bold)
-                        Text("${usd(spend, b)} of ${usd(cap, b)} daily budget", fontSize = 13.sp, color = Muted)
-                        LinearProgressIndicator(
-                            progress = { if (cap > 0) (spend / cap).toFloat().coerceIn(0f, 1f) else 0f },
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp)
-                        )
-                        Row {
-                            Mini("Today", usd(spend, b), Modifier.weight(1f))
-                            Mini("Lifetime", usd(vm.usedOf(a.id), b), Modifier.weight(1f))
-                            Mini("Active campaigns", "${vm.activeCount(a.id)} / ${cs.size}", Modifier.weight(1f))
+            0 -> {
+                val budgetCap = cs.sumOf { it.totalBudget }
+                val used = cs.sumOf { it.used }
+                val shown = cs.filter { statusFilter == "All" || campaignStatus(it) == statusFilter }
+                LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.weight(1f)) {
+                    item {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.horizontalScroll(rememberScrollState())
+                        ) {
+                            AssistChip(
+                                onClick = { statusFilter = nextOf(statusFilter, listOf("All", "Active", "Paused", "New")) },
+                                label = { Text("Status: $statusFilter ▾") }
+                            )
+                            AssistChip(
+                                onClick = { vm.notice = "Date filter preview — Meta data is not connected yet." },
+                                label = { Text("Last 7 days ▾") }
+                            )
+                            Button(onClick = { showNewCampaign = true }) {
+                                Icon(Icons.Default.Add, null, Modifier.size(18.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("New campaign")
+                            }
                         }
                     }
-                }
-                if (cs.isEmpty()) item {
-                    CardTile { Text("No campaigns in this account.", color = Muted) }
-                }
-                items(cs, key = { it.id }) { c ->
-                    CardTile {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text(c.name, fontWeight = FontWeight.Bold)
-                                Text("Spend today ${usd(c.spend, b)}", fontSize = 12.sp, color = Muted)
+                    item {
+                        val shape = RoundedCornerShape(20.dp)
+                        Surface(shape = shape, color = MetaBlue, modifier = Modifier.fillMaxWidth().soft(shape)) {
+                            Column(Modifier.padding(16.dp)) {
+                                Row {
+                                    Column(Modifier.weight(1f)) {
+                                        Text("Total budget", fontSize = 12.sp, color = Color.White.copy(alpha = 0.8f))
+                                        Text(usd(budgetCap, b), fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+                                    }
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text("Remaining", fontSize = 12.sp, color = Color.White.copy(alpha = 0.8f))
+                                        Text(usd(budgetCap - used, b), fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+                                    }
+                                }
+                                LinearProgressIndicator(
+                                    progress = { if (budgetCap > 0) (used / budgetCap).toFloat().coerceIn(0f, 1f) else 0f },
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+                                    color = Color.White,
+                                    trackColor = Color.White.copy(alpha = 0.3f)
+                                )
+                                val pct = if (budgetCap > 0) (used / budgetCap * 100).toInt() else 0
+                                Text("Used ${usd(used, b)} · $pct% used", fontSize = 12.sp, color = Color.White.copy(alpha = 0.85f))
                             }
-                            Switch(checked = c.active, onCheckedChange = {
-                                vm.toggleCampaign(c.id, it)
-                                vm.notice = if (it) "Campaign ON (demo preview — not sent to Meta)." else "Campaign OFF (demo preview — not sent to Meta)."
-                            })
-                        }
-                        Spacer(Modifier.height(10.dp))
-                        Row {
-                            Mini("CPR", usd(c.cpr), Modifier.weight(1f))
-                            Mini("CTR", c.ctr.toString() + "%", Modifier.weight(1f))
-                            Mini("CPC", usd(c.cpc), Modifier.weight(1f))
-                        }
-                        Spacer(Modifier.height(12.dp))
-                        Row {
-                            Text("Total budget", fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                            Text(usd(c.totalBudget, b), fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                        }
-                        LinearProgressIndicator(
-                            progress = { (c.used / c.totalBudget).toFloat().coerceIn(0f, 1f) },
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
-                        )
-                        Row {
-                            Mini("Used", usd(c.used, b), Modifier.weight(1f))
-                            Mini("Remaining", usd(c.totalBudget - c.used, b), Modifier.weight(1f))
-                        }
-                        Spacer(Modifier.height(10.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text("Daily budget", fontSize = 12.sp, color = Muted)
-                                Text(usd(c.budget, b), fontWeight = FontWeight.Bold)
-                            }
-                            FilledTonalButton(onClick = { vm.budgetCampaignId = c.id; vm.budgetText = money(c.budget) }) { Text("Edit budget") }
                         }
                     }
+                    if (shown.isEmpty()) item { CardTile { Text("No campaigns in this status.", color = Muted) } }
+                    if (vm.desktop) {
+                        items(shown.chunked(2)) { pair ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
+                                pair.forEach { c -> Box(Modifier.weight(1f)) { CampaignCard(vm, c, b) } }
+                                if (pair.size == 1) Spacer(Modifier.weight(1f))
+                            }
+                        }
+                    } else {
+                        items(shown, key = { it.id }) { c -> CampaignCard(vm, c, b) }
+                    }
                 }
+                if (showNewCampaign) NewCampaignDialog(vm, a.id) { showNewCampaign = false }
             }
             1 -> LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.weight(1f)) {
                 item { Metric("Current threshold", usd(50.0, b), "Sample only • not live billing", Modifier.fillMaxWidth()) }
@@ -850,6 +916,96 @@ private fun AccountScreen(vm: AdsViewModel, act: Actions) {
             }
         }
     }
+}
+
+@Composable
+private fun CampaignCard(vm: AdsViewModel, c: CampaignItem, b: Boolean) {
+    val status = campaignStatus(c)
+    val pct = if (c.totalBudget > 0) (c.used / c.totalBudget).toFloat().coerceIn(0f, 1f) else 0f
+    CardTile {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            StatusBadge(status)
+            Spacer(Modifier.weight(1f))
+            Switch(checked = c.active, onCheckedChange = {
+                vm.toggleCampaign(c.id, it)
+                vm.notice = if (it) "Campaign ON (demo preview — not sent to Meta)." else "Campaign OFF (demo preview — not sent to Meta)."
+            })
+        }
+        Text(c.name, fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.padding(top = 8.dp))
+        Row(Modifier.padding(top = 10.dp)) {
+            Mini("CPR", usd(c.cpr), Modifier.weight(1f))
+            Mini("CTR", "${c.ctr}%", Modifier.weight(1f))
+            Mini("CPC", usd(c.cpc), Modifier.weight(1f))
+            Mini("Today", usd(c.spend, b), Modifier.weight(1f))
+        }
+        LinearProgressIndicator(progress = { pct }, modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp))
+        Row {
+            Text("Used ${usd(c.used, b)}", fontSize = 12.sp, color = Muted, modifier = Modifier.weight(1f))
+            Text("Left ${usd(c.totalBudget - c.used, b)} of ${usd(c.totalBudget, b)}", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Daily budget", fontSize = 12.sp, color = Muted)
+                Text(usd(c.budget, b), fontWeight = FontWeight.Bold)
+            }
+            FilledTonalButton(onClick = { vm.budgetCampaignId = c.id; vm.budgetText = money(c.budget) }) { Text("Edit budget") }
+        }
+    }
+}
+
+@Composable
+private fun StatusBadge(status: String) {
+    val c = when (status) {
+        "Active" -> Good
+        "Paused" -> Color(0xFFD97706)
+        else -> MetaBlue
+    }
+    Surface(shape = RoundedCornerShape(50), color = c.copy(alpha = 0.14f)) {
+        Text(
+            if (status == "New") "★ New" else status,
+            color = c, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+        )
+    }
+}
+
+@Composable
+private fun NewCampaignDialog(vm: AdsViewModel, accountId: String, onDismiss: () -> Unit) {
+    var name by remember { mutableStateOf("") }
+    var daily by remember { mutableStateOf("") }
+    var total by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("New campaign") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(name, { name = it }, label = { Text("Campaign name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(
+                    daily, { daily = it.filter { ch -> ch.isDigit() || ch == '.' } },
+                    label = { Text("Daily budget (USD)") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                )
+                OutlinedTextField(
+                    total, { total = it.filter { ch -> ch.isDigit() || ch == '.' } },
+                    label = { Text("Total budget (USD)") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val d = daily.toDoubleOrNull()
+                val t = total.toDoubleOrNull()
+                when {
+                    name.isBlank() -> vm.notice = "Enter a campaign name."
+                    d == null || d <= 0.0 || t == null || t <= 0.0 -> vm.notice = "Enter valid budgets greater than zero."
+                    else -> { vm.addCampaign(accountId, name.trim(), d, t); onDismiss() }
+                }
+            }) { Text("Create") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
 }
 
 // ───────────────────────── Tools ─────────────────────────
@@ -1033,7 +1189,14 @@ private fun ToolScreen(vm: AdsViewModel, store: AppStore, act: Actions) {
                         Text("Dark theme", modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
                         Switch(vm.darkTheme, onCheckedChange = { vm.darkTheme = it; store.setFlag("dark", it) })
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Desktop layout", fontWeight = FontWeight.SemiBold)
+                            Text("Wide layout with side menu. Scroll sideways on phones.", fontSize = 12.sp, color = Muted)
+                        }
+                        Switch(vm.desktop, onCheckedChange = { vm.desktop = it; store.setFlag("desk", it) })
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
                         Text("Show amounts in BDT too", modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
                         Switch(vm.showBdt, onCheckedChange = { vm.showBdt = it; store.setFlag("bdt", it) })
                     }
@@ -1180,7 +1343,7 @@ private fun BottomDock(vm: AdsViewModel) {
 }
 
 @Composable
-private fun CardTile(modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
+internal fun CardTile(modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
     val shape = RoundedCornerShape(20.dp)
     val m = modifier.fillMaxWidth().soft(shape)
     val colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -1200,7 +1363,7 @@ private fun Metric(title: String, value: String, caption: String, modifier: Modi
 }
 
 @Composable
-private fun Mini(label: String, value: String, modifier: Modifier) {
+internal fun Mini(label: String, value: String, modifier: Modifier) {
     Column(modifier) {
         Text(label, fontSize = 12.sp, color = Muted)
         Text(value, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -1208,7 +1371,7 @@ private fun Mini(label: String, value: String, modifier: Modifier) {
 }
 
 @Composable
-private fun Pill(active: Boolean) {
+internal fun Pill(active: Boolean) {
     val c = if (active) Good else Bad
     Surface(shape = RoundedCornerShape(50), color = c.copy(alpha = 0.12f)) {
         Text(if (active) "Active" else "Disabled", color = c, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp))
